@@ -18,11 +18,13 @@ export default function Home() {
   const [showAddInvestor, setShowAddInvestor] = useState(false)
   const [showUpdateCapital, setShowUpdateCapital] = useState(false)
   const [showCommissionModal, setShowCommissionModal] = useState(null)
+  const [showEditInvestor, setShowEditInvestor] = useState(null)
   const [showHelp, setShowHelp] = useState(false)
   
   const [newInvestor, setNewInvestor] = useState({ name: '', capital: '', commission: 55, mode: 'reinvest' })
   const [capitalUpdate, setCapitalUpdate] = useState({ newTotal: '' })
   const [commissionAction, setCommissionAction] = useState({ amount: '', action: 'withdraw' })
+  const [editForm, setEditForm] = useState({ commissionRate: '' })
 
   const fetchData = async () => {
     try {
@@ -81,6 +83,19 @@ export default function Home() {
     fetchData()
   }
 
+  const saveEditInvestor = async (investorId) => {
+    await fetch('/api/investors/' + investorId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        commissionRate: parseFloat(editForm.commissionRate)
+      })
+    })
+    setShowEditInvestor(null)
+    setEditForm({ commissionRate: '' })
+    fetchData()
+  }
+
   const toggleMode = async (investorId, currentMode) => {
     await fetch('/api/investors/' + investorId, {
       method: 'PATCH',
@@ -104,7 +119,6 @@ export default function Home() {
 
   const totalCapital = data.totalCapital || 0
   const initialCapital = data.initialCapital || 0
-  // Fix: profit is only calculated when totalCapital differs from initialCapital
   const profit = totalCapital - initialCapital
   const profitPercent = initialCapital > 0 ? ((profit / initialCapital) * 100).toFixed(2) : '0.00'
 
@@ -112,7 +126,6 @@ export default function Home() {
     <div className="container">
       <h1>💹 Portfolio Manager</h1>
 
-      {/* Help button */}
       <button 
         onClick={() => setShowHelp(true)} 
         style={{ 
@@ -131,7 +144,6 @@ export default function Home() {
         ❓
       </button>
 
-      {/* Stats - Mobile optimized */}
       <div className="stats-grid">
         <div className="stat-card">
           <h3>💰 Capital Total</h3>
@@ -154,7 +166,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Actions - Big mobile buttons */}
       <div className="section">
         <div className="action-buttons">
           <button className="btn-primary btn-large" onClick={() => setShowAddInvestor(true)}>
@@ -169,7 +180,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Investors - Card view for mobile */}
       <div className="section">
         <h2>👥 Investisseurs</h2>
         {data.investors?.length > 0 ? (
@@ -184,12 +194,30 @@ export default function Home() {
                 <div className="investor-card" key={inv.id}>
                   <div className="investor-header">
                     <strong>{inv.name}</strong>
-                    <span 
-                      className={`badge ${inv.mode === 'reinvest' ? 'badge-reinvest' : 'badge-withdraw'}`}
-                      onClick={() => toggleMode(inv.id, inv.mode)}
-                    >
-                      {inv.mode === 'reinvest' ? '🔄' : '💸'}
-                    </span>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <span 
+                        className={`badge ${inv.mode === 'reinvest' ? 'badge-reinvest' : 'badge-withdraw'}`}
+                        onClick={() => toggleMode(inv.id, inv.mode)}
+                      >
+                        {inv.mode === 'reinvest' ? '🔄' : '💸'}
+                      </span>
+                      <button 
+                        onClick={() => {
+                          setShowEditInvestor(inv)
+                          setEditForm({ commissionRate: inv.commissionRate.toString() })
+                        }}
+                        style={{ 
+                          background: 'rgba(255,255,255,0.1)', 
+                          border: 'none', 
+                          borderRadius: '5px',
+                          padding: '5px 8px',
+                          cursor: 'pointer',
+                          fontSize: '0.8rem'
+                        }}
+                      >
+                        ✏️
+                      </button>
+                    </div>
                   </div>
                   
                   <div className="investor-stats">
@@ -211,22 +239,24 @@ export default function Home() {
                         {gains >= 0 ? '+' : ''}{formatCurrency(gains)}
                       </span>
                     </div>
-                    {inv.commissionRate > 0 && (
-                      <div className="stat-row">
-                        <span>Commission ({inv.commissionRate}%)</span>
-                        <span style={{ color: '#00d4ff' }}>{formatCurrency(commission)}</span>
-                      </div>
-                    )}
+                    <div className="stat-row">
+                      <span>Commission ({inv.commissionRate}%)</span>
+                      <span style={{ color: inv.commissionRate > 0 ? '#00d4ff' : '#666' }}>
+                        {inv.commissionRate > 0 ? formatCurrency(commission) : '—'}
+                      </span>
+                    </div>
                   </div>
                   
                   <div className="investor-actions">
-                    <button 
-                      className="btn-primary btn-sm" 
-                      onClick={() => setShowCommissionModal(inv)}
-                      disabled={commission <= 0}
-                    >
-                      💰 Commission
-                    </button>
+                    {inv.commissionRate > 0 && (
+                      <button 
+                        className="btn-primary btn-sm" 
+                        onClick={() => setShowCommissionModal(inv)}
+                        disabled={commission <= 0}
+                      >
+                        💰 Commission
+                      </button>
+                    )}
                     <button className="btn-danger btn-sm" onClick={() => removeInvestor(inv.id)}>
                       🗑️
                     </button>
@@ -246,7 +276,6 @@ export default function Home() {
         )}
       </div>
 
-      {/* History */}
       <div className="section">
         <h2>📜 Historique</h2>
         {data.history?.length > 0 ? (
@@ -277,28 +306,55 @@ export default function Home() {
             <div className="help-content">
               <h4>1️⃣ Ajouter les investisseurs</h4>
               <p>• <strong>Toi (le trader)</strong> : ajoute-toi avec <strong>0% commission</strong></p>
-              <p>• <strong>Tes investisseurs</strong> : ajoute-les avec leur % de commission (ex: 55%)</p>
+              <p>• <strong>Tes investisseurs</strong> : ajoute-les avec leur % de commission (ex: 50%)</p>
               
               <h4>2️⃣ Mettre à jour le capital</h4>
               <p>Quand ton portfolio évolue, clique sur "Mettre à jour Capital" et entre la <strong>nouvelle valeur totale</strong>.</p>
-              <p>Les gains/pertes seront calculés automatiquement.</p>
               
-              <h4>3️⃣ Gérer les commissions</h4>
-              <p>Quand il y a des gains, tu peux :</p>
-              <p>• <strong>💸 Retirer</strong> la commission (l'argent sort du portfolio)</p>
-              <p>• <strong>🔄 Réinvestir</strong> la commission (augmente le capital de l'investisseur)</p>
+              <h4>3️⃣ Modifier un investisseur</h4>
+              <p>Clique sur ✏️ pour modifier le % de commission.</p>
               
-              <h4>💡 Exemple</h4>
-              <p>Toi : 4000€ (0% commission)<br/>
-              Investisseur A : 1000€ (55% commission)<br/>
-              → Capital total : 5000€</p>
-              <p>Si le portfolio passe à 6000€ (+1000€ de gains) :<br/>
-              • Toi : +800€ de gains<br/>
-              • Investisseur A : +200€ de gains → 110€ de commission disponible</p>
+              <h4>4️⃣ Gérer les commissions</h4>
+              <p>• <strong>💸 Retirer</strong> : l'argent sort du portfolio</p>
+              <p>• <strong>🔄 Réinvestir</strong> : augmente le capital de l'investisseur</p>
             </div>
             <button className="btn-primary" onClick={() => setShowHelp(false)} style={{ width: '100%', marginTop: '20px' }}>
               Compris ! 👍
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Investor Modal */}
+      {showEditInvestor && (
+        <div className="modal-overlay" onClick={() => setShowEditInvestor(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h3>✏️ Modifier {showEditInvestor.name}</h3>
+            <div className="form-group">
+              <label>Commission sur gains (%)</label>
+              <input 
+                type="number"
+                step="0.1"
+                value={editForm.commissionRate}
+                onChange={e => setEditForm({...editForm, commissionRate: e.target.value})}
+                placeholder="0 pour toi-même"
+              />
+              <small style={{ color: '#888', marginTop: '5px', display: 'block' }}>
+                💡 Mets 0% si c'est toi (le trader)
+              </small>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn-danger" onClick={() => setShowEditInvestor(null)}>
+                Annuler
+              </button>
+              <button 
+                type="button" 
+                className="btn-primary"
+                onClick={() => saveEditInvestor(showEditInvestor.id)}
+              >
+                Enregistrer
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -334,9 +390,10 @@ export default function Home() {
                 <label>Commission sur gains (%)</label>
                 <input 
                   type="number"
+                  step="0.1"
                   value={newInvestor.commission}
                   onChange={e => setNewInvestor({...newInvestor, commission: e.target.value})}
-                  placeholder="0 pour toi, 55 pour investisseurs"
+                  placeholder="0 pour toi, 50 pour investisseurs"
                   required
                 />
                 <small style={{ color: '#888', marginTop: '5px', display: 'block' }}>
@@ -383,9 +440,6 @@ export default function Home() {
                   placeholder={totalCapital.toString()}
                   required
                 />
-                <small style={{ color: '#888', marginTop: '5px', display: 'block' }}>
-                  💡 Entre la valeur actuelle de ton compte de trading
-                </small>
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn-danger" onClick={() => setShowUpdateCapital(false)}>

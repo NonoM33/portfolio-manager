@@ -8,10 +8,15 @@ export async function POST(request) {
     const body = await request.json()
     const { name, capital, commissionRate, mode } = body
     
+    // Fix: handle 0% commission correctly (0 is falsy in JS)
+    const rate = commissionRate !== undefined && commissionRate !== null && commissionRate !== '' 
+      ? parseFloat(commissionRate) 
+      : 55
+    
     const investor = await addInvestor({
       name,
       capital: parseFloat(capital),
-      commissionRate: parseFloat(commissionRate) || 55,
+      commissionRate: rate,
       mode: mode || 'reinvest'
     })
     
