@@ -18,6 +18,7 @@ export default function Home() {
   const [showAddInvestor, setShowAddInvestor] = useState(false)
   const [showUpdateCapital, setShowUpdateCapital] = useState(false)
   const [showCommissionModal, setShowCommissionModal] = useState(null)
+  const [showHelp, setShowHelp] = useState(false)
   
   const [newInvestor, setNewInvestor] = useState({ name: '', capital: '', commission: 55, mode: 'reinvest' })
   const [capitalUpdate, setCapitalUpdate] = useState({ newTotal: '' })
@@ -103,136 +104,206 @@ export default function Home() {
 
   const totalCapital = data.totalCapital || 0
   const initialCapital = data.initialCapital || 0
+  // Fix: profit is only calculated when totalCapital differs from initialCapital
   const profit = totalCapital - initialCapital
-  const profitPercent = initialCapital > 0 ? ((profit / initialCapital) * 100).toFixed(2) : 0
+  const profitPercent = initialCapital > 0 ? ((profit / initialCapital) * 100).toFixed(2) : '0.00'
 
   return (
     <div className="container">
-      <h1>💹 Trading Portfolio Manager</h1>
+      <h1>💹 Portfolio Manager</h1>
 
+      {/* Help button */}
+      <button 
+        onClick={() => setShowHelp(true)} 
+        style={{ 
+          position: 'absolute', 
+          top: '20px', 
+          right: '20px', 
+          background: 'rgba(255,255,255,0.1)', 
+          border: 'none',
+          borderRadius: '50%',
+          width: '40px',
+          height: '40px',
+          fontSize: '1.2rem',
+          cursor: 'pointer'
+        }}
+      >
+        ❓
+      </button>
+
+      {/* Stats - Mobile optimized */}
       <div className="stats-grid">
         <div className="stat-card">
-          <h3>Capital Total</h3>
+          <h3>💰 Capital Total</h3>
           <div className="value">{formatCurrency(totalCapital)}</div>
         </div>
         <div className="stat-card">
-          <h3>Capital Initial</h3>
+          <h3>📊 Capital Initial</h3>
           <div className="value">{formatCurrency(initialCapital)}</div>
         </div>
         <div className="stat-card">
-          <h3>Profit/Perte</h3>
-          <div className={`value ${profit >= 0 ? 'profit' : 'loss'}`}>
-            {profit >= 0 ? '+' : ''}{formatCurrency(profit)} ({profitPercent}%)
+          <h3>{profit >= 0 ? '📈' : '📉'} Performance</h3>
+          <div className={`value ${profit > 0 ? 'profit' : profit < 0 ? 'loss' : ''}`}>
+            {profit > 0 ? '+' : ''}{formatCurrency(profit)}
+            <span style={{ fontSize: '0.9rem', opacity: 0.8 }}> ({profitPercent}%)</span>
           </div>
         </div>
         <div className="stat-card">
-          <h3>Investisseurs</h3>
+          <h3>👥 Investisseurs</h3>
           <div className="value">{data.investors?.length || 0}</div>
         </div>
       </div>
 
+      {/* Actions - Big mobile buttons */}
       <div className="section">
-        <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-          <button className="btn-primary" onClick={() => setShowAddInvestor(true)}>
+        <div className="action-buttons">
+          <button className="btn-primary btn-large" onClick={() => setShowAddInvestor(true)}>
             ➕ Ajouter Investisseur
           </button>
-          <button className="btn-success" onClick={() => setShowUpdateCapital(true)}>
-            📈 Mettre à jour le Capital
+          <button className="btn-success btn-large" onClick={() => setShowUpdateCapital(true)}>
+            📈 Mettre à jour Capital
           </button>
-          <button className="btn-secondary" onClick={downloadBackup} style={{ background: '#666' }}>
-            💾 Télécharger Backup
+          <button className="btn-secondary btn-large" onClick={downloadBackup}>
+            💾 Backup
           </button>
         </div>
       </div>
 
+      {/* Investors - Card view for mobile */}
       <div className="section">
         <h2>👥 Investisseurs</h2>
         {data.investors?.length > 0 ? (
-          <table>
-            <thead>
-              <tr>
-                <th>Nom</th>
-                <th>Capital Investi</th>
-                <th>Part (%)</th>
-                <th>Valeur Actuelle</th>
-                <th>Gains</th>
-                <th>Commission (%)</th>
-                <th>Mode</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.investors.map(inv => {
-                const share = initialCapital > 0 ? (inv.capital / initialCapital) * 100 : 0
-                const currentValue = initialCapital > 0 ? (share / 100) * totalCapital : inv.capital
-                const gains = currentValue - inv.capital
-                const commission = gains > 0 ? gains * (inv.commissionRate / 100) : 0
-                
-                return (
-                  <tr key={inv.id}>
-                    <td><strong>{inv.name}</strong></td>
-                    <td>{formatCurrency(inv.capital)}</td>
-                    <td>{share.toFixed(2)}%</td>
-                    <td>{formatCurrency(currentValue)}</td>
-                    <td style={{ color: gains >= 0 ? '#00ff88' : '#ff4757' }}>
-                      {gains >= 0 ? '+' : ''}{formatCurrency(gains)}
-                    </td>
-                    <td>{inv.commissionRate}%</td>
-                    <td>
-                      <span 
-                        className={`badge ${inv.mode === 'reinvest' ? 'badge-reinvest' : 'badge-withdraw'}`}
-                        onClick={() => toggleMode(inv.id, inv.mode)}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        {inv.mode === 'reinvest' ? '🔄 Réinvestir' : '💸 Retirer'}
+          <div className="investor-cards">
+            {data.investors.map(inv => {
+              const share = initialCapital > 0 ? (inv.capital / initialCapital) * 100 : 0
+              const currentValue = initialCapital > 0 ? (share / 100) * totalCapital : inv.capital
+              const gains = currentValue - inv.capital
+              const commission = gains > 0 ? gains * (inv.commissionRate / 100) : 0
+              
+              return (
+                <div className="investor-card" key={inv.id}>
+                  <div className="investor-header">
+                    <strong>{inv.name}</strong>
+                    <span 
+                      className={`badge ${inv.mode === 'reinvest' ? 'badge-reinvest' : 'badge-withdraw'}`}
+                      onClick={() => toggleMode(inv.id, inv.mode)}
+                    >
+                      {inv.mode === 'reinvest' ? '🔄' : '💸'}
+                    </span>
+                  </div>
+                  
+                  <div className="investor-stats">
+                    <div className="stat-row">
+                      <span>Capital investi</span>
+                      <span>{formatCurrency(inv.capital)}</span>
+                    </div>
+                    <div className="stat-row">
+                      <span>Part du portfolio</span>
+                      <span>{share.toFixed(1)}%</span>
+                    </div>
+                    <div className="stat-row">
+                      <span>Valeur actuelle</span>
+                      <span>{formatCurrency(currentValue)}</span>
+                    </div>
+                    <div className="stat-row">
+                      <span>Gains/Pertes</span>
+                      <span style={{ color: gains >= 0 ? '#00ff88' : '#ff4757', fontWeight: 'bold' }}>
+                        {gains >= 0 ? '+' : ''}{formatCurrency(gains)}
                       </span>
-                    </td>
-                    <td>
-                      <div className="actions">
-                        <button 
-                          className="btn-primary btn-sm" 
-                          onClick={() => setShowCommissionModal(inv)}
-                          disabled={commission <= 0}
-                        >
-                          Commission
-                        </button>
-                        <button className="btn-danger btn-sm" onClick={() => removeInvestor(inv.id)}>
-                          ✕
-                        </button>
+                    </div>
+                    {inv.commissionRate > 0 && (
+                      <div className="stat-row">
+                        <span>Commission ({inv.commissionRate}%)</span>
+                        <span style={{ color: '#00d4ff' }}>{formatCurrency(commission)}</span>
                       </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                    )}
+                  </div>
+                  
+                  <div className="investor-actions">
+                    <button 
+                      className="btn-primary btn-sm" 
+                      onClick={() => setShowCommissionModal(inv)}
+                      disabled={commission <= 0}
+                    >
+                      💰 Commission
+                    </button>
+                    <button className="btn-danger btn-sm" onClick={() => removeInvestor(inv.id)}>
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         ) : (
-          <p style={{ color: '#aaa', textAlign: 'center', padding: '20px' }}>
-            Aucun investisseur. Ajoutez le premier !
-          </p>
+          <div className="empty-state">
+            <p>Aucun investisseur</p>
+            <p style={{ fontSize: '0.9rem', opacity: 0.7 }}>
+              Commence par ajouter toi-même (0% commission)<br/>
+              puis les autres investisseurs
+            </p>
+          </div>
         )}
       </div>
 
+      {/* History */}
       <div className="section">
         <h2>📜 Historique</h2>
         {data.history?.length > 0 ? (
-          data.history.slice(0, 10).map((h, i) => (
-            <div className="history-item" key={i}>
-              <div>
-                <strong>{h.type}</strong>
-                {h.investor && <span style={{ color: '#aaa' }}> - {h.investor}</span>}
-                <div className="date">{formatDate(h.date)}</div>
+          <div className="history-list">
+            {data.history.slice(0, 10).map((h, i) => (
+              <div className="history-item" key={i}>
+                <div>
+                  <strong>{h.type}</strong>
+                  {h.investor && <span className="investor-name"> • {h.investor}</span>}
+                  <div className="date">{formatDate(h.date)}</div>
+                </div>
+                <div className={`amount ${h.amount >= 0 ? 'positive' : 'negative'}`}>
+                  {h.amount >= 0 ? '+' : ''}{formatCurrency(h.amount)}
+                </div>
               </div>
-              <div className={`amount ${h.amount >= 0 ? 'positive' : 'negative'}`}>
-                {h.amount >= 0 ? '+' : ''}{formatCurrency(h.amount)}
-              </div>
-            </div>
-          ))
+            ))}
+          </div>
         ) : (
-          <p style={{ color: '#aaa', textAlign: 'center' }}>Aucun historique</p>
+          <p className="empty-state">Aucun historique</p>
         )}
       </div>
 
+      {/* Help Modal */}
+      {showHelp && (
+        <div className="modal-overlay" onClick={() => setShowHelp(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h3>❓ Comment utiliser l'app</h3>
+            <div className="help-content">
+              <h4>1️⃣ Ajouter les investisseurs</h4>
+              <p>• <strong>Toi (le trader)</strong> : ajoute-toi avec <strong>0% commission</strong></p>
+              <p>• <strong>Tes investisseurs</strong> : ajoute-les avec leur % de commission (ex: 55%)</p>
+              
+              <h4>2️⃣ Mettre à jour le capital</h4>
+              <p>Quand ton portfolio évolue, clique sur "Mettre à jour Capital" et entre la <strong>nouvelle valeur totale</strong>.</p>
+              <p>Les gains/pertes seront calculés automatiquement.</p>
+              
+              <h4>3️⃣ Gérer les commissions</h4>
+              <p>Quand il y a des gains, tu peux :</p>
+              <p>• <strong>💸 Retirer</strong> la commission (l'argent sort du portfolio)</p>
+              <p>• <strong>🔄 Réinvestir</strong> la commission (augmente le capital de l'investisseur)</p>
+              
+              <h4>💡 Exemple</h4>
+              <p>Toi : 4000€ (0% commission)<br/>
+              Investisseur A : 1000€ (55% commission)<br/>
+              → Capital total : 5000€</p>
+              <p>Si le portfolio passe à 6000€ (+1000€ de gains) :<br/>
+              • Toi : +800€ de gains<br/>
+              • Investisseur A : +200€ de gains → 110€ de commission disponible</p>
+            </div>
+            <button className="btn-primary" onClick={() => setShowHelp(false)} style={{ width: '100%', marginTop: '20px' }}>
+              Compris ! 👍
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add Investor Modal */}
       {showAddInvestor && (
         <div className="modal-overlay" onClick={() => setShowAddInvestor(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -244,16 +315,18 @@ export default function Home() {
                   type="text" 
                   value={newInvestor.name}
                   onChange={e => setNewInvestor({...newInvestor, name: e.target.value})}
+                  placeholder="Ex: Lenny, Pierre..."
                   required
                 />
               </div>
               <div className="form-group">
-                <label>Capital (€)</label>
+                <label>Capital investi (€)</label>
                 <input 
                   type="number" 
                   step="0.01"
                   value={newInvestor.capital}
                   onChange={e => setNewInvestor({...newInvestor, capital: e.target.value})}
+                  placeholder="Ex: 5000"
                   required
                 />
               </div>
@@ -263,8 +336,12 @@ export default function Home() {
                   type="number"
                   value={newInvestor.commission}
                   onChange={e => setNewInvestor({...newInvestor, commission: e.target.value})}
+                  placeholder="0 pour toi, 55 pour investisseurs"
                   required
                 />
+                <small style={{ color: '#888', marginTop: '5px', display: 'block' }}>
+                  💡 Mets 0% pour toi-même (le trader)
+                </small>
               </div>
               <div className="form-group">
                 <label>Mode par défaut</label>
@@ -287,16 +364,17 @@ export default function Home() {
         </div>
       )}
 
+      {/* Update Capital Modal */}
       {showUpdateCapital && (
         <div className="modal-overlay" onClick={() => setShowUpdateCapital(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <h3>📈 Mettre à jour le Capital Total</h3>
-            <p style={{ color: '#aaa', marginBottom: '20px' }}>
-              Capital actuel : <strong>{formatCurrency(totalCapital)}</strong>
+            <h3>📈 Mettre à jour le Capital</h3>
+            <p style={{ color: '#aaa', marginBottom: '15px' }}>
+              Capital actuel : <strong style={{ color: '#00d4ff' }}>{formatCurrency(totalCapital)}</strong>
             </p>
             <form onSubmit={updateCapital}>
               <div className="form-group">
-                <label>Nouveau Capital Total (€)</label>
+                <label>Nouvelle valeur totale du portfolio (€)</label>
                 <input 
                   type="number" 
                   step="0.01"
@@ -305,6 +383,9 @@ export default function Home() {
                   placeholder={totalCapital.toString()}
                   required
                 />
+                <small style={{ color: '#888', marginTop: '5px', display: 'block' }}>
+                  💡 Entre la valeur actuelle de ton compte de trading
+                </small>
               </div>
               <div className="modal-actions">
                 <button type="button" className="btn-danger" onClick={() => setShowUpdateCapital(false)}>
@@ -317,6 +398,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* Commission Modal */}
       {showCommissionModal && (
         <div className="modal-overlay" onClick={() => setShowCommissionModal(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -327,14 +409,16 @@ export default function Home() {
               const gains = currentValue - showCommissionModal.capital
               const commission = gains > 0 ? gains * (showCommissionModal.commissionRate / 100) : 0
               return (
-                <>
-                  <p style={{ color: '#aaa', marginBottom: '10px' }}>
-                    Gains actuels : <strong style={{ color: '#00ff88' }}>{formatCurrency(gains)}</strong>
-                  </p>
-                  <p style={{ color: '#aaa', marginBottom: '20px' }}>
-                    Commission disponible ({showCommissionModal.commissionRate}%) : <strong style={{ color: '#00d4ff' }}>{formatCurrency(commission)}</strong>
-                  </p>
-                </>
+                <div style={{ marginBottom: '20px' }}>
+                  <div className="stat-row" style={{ marginBottom: '10px' }}>
+                    <span>Gains actuels</span>
+                    <span style={{ color: '#00ff88', fontWeight: 'bold' }}>{formatCurrency(gains)}</span>
+                  </div>
+                  <div className="stat-row">
+                    <span>Commission dispo ({showCommissionModal.commissionRate}%)</span>
+                    <span style={{ color: '#00d4ff', fontWeight: 'bold' }}>{formatCurrency(commission)}</span>
+                  </div>
+                </div>
               )
             })()}
             <div className="form-group">
@@ -343,8 +427,8 @@ export default function Home() {
                 value={commissionAction.action}
                 onChange={e => setCommissionAction({...commissionAction, action: e.target.value})}
               >
-                <option value="withdraw">💸 Retirer la commission</option>
-                <option value="reinvest">🔄 Réinvestir la commission</option>
+                <option value="withdraw">💸 Retirer (sort du portfolio)</option>
+                <option value="reinvest">🔄 Réinvestir (augmente son capital)</option>
               </select>
             </div>
             <div className="form-group">
@@ -354,7 +438,7 @@ export default function Home() {
                 step="0.01"
                 value={commissionAction.amount}
                 onChange={e => setCommissionAction({...commissionAction, amount: e.target.value})}
-                placeholder="Tout"
+                placeholder="Laisser vide pour tout"
               />
             </div>
             <div className="modal-actions">
@@ -373,8 +457,8 @@ export default function Home() {
         </div>
       )}
 
-      <p style={{ textAlign: 'center', color: '#666', marginTop: '30px', fontSize: '0.85rem' }}>
-        🗄️ Données stockées en base PostgreSQL avec backup mensuel automatique
+      <p style={{ textAlign: 'center', color: '#555', marginTop: '30px', fontSize: '0.8rem' }}>
+        🗄️ Données sauvegardées • Backup mensuel auto
       </p>
     </div>
   )
