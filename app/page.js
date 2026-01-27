@@ -12,8 +12,37 @@ const formatDate = (date) => {
   })
 }
 
+const defaultData = {
+  totalCapital: 0,
+  initialCapital: 0,
+  investors: [],
+  history: []
+}
+
+// Local storage helpers
+const STORAGE_KEY = 'portfolio_data'
+
+function loadData() {
+  if (typeof window === 'undefined') return defaultData
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    return saved ? JSON.parse(saved) : defaultData
+  } catch {
+    return defaultData
+  }
+}
+
+function saveData(data) {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+}
+
+function generateId() {
+  return Math.random().toString(36).substr(2, 9) + Date.now().toString(36)
+}
+
 export default function Home() {
-  const [data, setData] = useState(null)
+  const [data, setData] = useState(defaultData)
   const [loading, setLoading] = useState(true)
   const [showAddInvestor, setShowAddInvestor] = useState(false)
   const [showUpdateCapital, setShowUpdateCapital] = useState(false)
@@ -24,78 +53,179 @@ export default function Home() {
   const [capitalUpdate, setCapitalUpdate] = useState({ newTotal: '' })
   const [commissionAction, setCommissionAction] = useState({ amount: '', action: 'withdraw' })
 
-  const fetchData = async () => {
-    const res = await fetch('/api/portfolio')
-    const json = await res.json()
-    setData(json)
+  useEffect(() => {
+    setData(loadData())
     setLoading(false)
+  }, [])
+
+  const updateData = (newData) => {
+    setData(newData)
+    saveData(newData)
   }
 
-  useEffect(() => { fetchData() }, [])
-
-  const addInvestor = async (e) => {
+  const addInvestor = (e) => {
     e.preventDefault()
-    await fetch('/api/investors', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: newInvestor.name,
-        capital: parseFloat(newInvestor.capital),
-        commissionRate: parseFloat(newInvestor.commission),
-        mode: newInvestor.mode
-      })
-    })
+    const investor = {
+      id: generateId(),
+      name: newInvestor.name,
+      capital: parseFloat(newInvestor.capital),
+      commissionRate: parseFloat(newInvestor.commission) || 55,
+      mode: newInvestor.mode,
+      createdAt: new Date().toISOString()
+    }
+    
+    const newData = {
+      ...data,
+      investors: [...data.investors, investor],
+      initialCapital: data.initialCapital + investor.capital,
+      totalCapital: data.totalCapital + investor.capital,
+      history: [{
+        type: 'Nouvel investisseur',
+        investor: investor.name,
+        amount: investor.capital,
+        date: new Date().toISOString()
+      }, ...data.history].slice(0, 100)
+    }
+    
+    updateData(newData)
     setNewInvestor({ name: '', capital: '', commission: 55, mode: 'reinvest' })
     setShowAddInvestor(false)
-    fetchData()
   }
 
-  const updateCapital = async (e) => {
+  const updateCapital = (e) => {
     e.preventDefault()
-    await fetch('/api/capital', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ newTotal: parseFloat(capitalUpdate.newTotal) })
-    })
+    const newTotal = parseFloat(capitalUpdate.newTotal)
+    const diff = newTotal - data.totalCapital
+    
+    const newData = {
+      ...data,
+      totalCapital: newTotal,
+      history: [{
+        type: diff >= 0 ? 'Profit' : 'Perte',
+        investor: null,
+        amount: diff,
+        date: new Date().toISOString()
+      }, ...data.history].slice(0, 100)
+    }
+    
+    updateData(newData)
     setCapitalUpdate({ newTotal: '' })
     setShowUpdateCapital(false)
-    fetchData()
   }
 
-  const handleCommission = async (investorId) => {
-    await fetch('/api/commission', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        investorId,
-        action: commissionAction.action,
-        amount: commissionAction.amount ? parseFloat(commissionAction.amount) : null
-      })
-    })
+  const handleCommission = (investorId) => {
+    const investor = data.investors.find(i => i.id === investorId)
+    if (!investor) return
+    
+    const share = investor.capital / data.initialCapital
+    const currentValue = share * data.totalCapital
+    const gains = currentValue - investor.capital
+    const maxCommission = gains > 0 ? gains * (investor.commissionRate / 100) : 0
+    const amount = commissionAction.amount ? Math.min(parseFloat(commissionAction.amount), maxCommission) : maxCommission
+    
+    if (amount <= 0) return
+    
+    let newData
+    if (commissionAction.action === 'withdraw') {
+      newData = {
+        ...data,
+        totalCapital: data.totalCapital - amount,
+        history: [{
+          type: 'Commission retirée',
+          investor: investor.name,
+          amount: -amount,
+          date: new Date().toISOString()
+        }, ...data.history].slice(0, 100)
+      }
+    } else {
+      newData = {
+        ...data,
+        investors: data.investors.map(i => 
+          i.id === investorId ? { ...i, capital: i.capital + amount } : i
+        ),
+        initialCapital: data.initialCapital + amount,
+        history: [{
+          type: 'Commission réinvestie',
+          investor: investor.name,
+          amount: amount,
+          date: new Date().toISOString()
+        }, ...data.history].slice(0, 100)
+      }
+    }
+    
+    updateData(newData)
     setCommissionAction({ amount: '', action: 'withdraw' })
     setShowCommissionModal(null)
-    fetchData()
   }
 
-  const toggleMode = async (investorId, currentMode) => {
-    await fetch('/api/investors/' + investorId, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: currentMode === 'reinvest' ? 'withdraw' : 'reinvest' })
-    })
-    fetchData()
+  const toggleMode = (investorId, currentMode) => {
+    const newData = {
+      ...data,
+      investors: data.investors.map(i => 
+        i.id === investorId ? { ...i, mode: currentMode === 'reinvest' ? 'withdraw' : 'reinvest' } : i
+      )
+    }
+    updateData(newData)
   }
 
-  const removeInvestor = async (investorId) => {
+  const removeInvestor = (investorId) => {
     if (!confirm('Supprimer cet investisseur ?')) return
-    await fetch('/api/investors/' + investorId, { method: 'DELETE' })
-    fetchData()
+    
+    const investor = data.investors.find(i => i.id === investorId)
+    if (!investor) return
+    
+    const share = investor.capital / data.initialCapital
+    const valueToRemove = share * data.totalCapital
+    
+    const newData = {
+      ...data,
+      investors: data.investors.filter(i => i.id !== investorId),
+      initialCapital: data.initialCapital - investor.capital,
+      totalCapital: data.totalCapital - valueToRemove,
+      history: [{
+        type: 'Investisseur retiré',
+        investor: investor.name,
+        amount: -investor.capital,
+        date: new Date().toISOString()
+      }, ...data.history].slice(0, 100)
+    }
+    
+    updateData(newData)
+  }
+
+  const exportData = () => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `portfolio-backup-${new Date().toISOString().split('T')[0]}.json`
+    a.click()
+  }
+
+  const importData = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      try {
+        const imported = JSON.parse(event.target.result)
+        if (imported.investors && imported.totalCapital !== undefined) {
+          updateData(imported)
+          alert('Données importées avec succès !')
+        } else {
+          alert('Format de fichier invalide')
+        }
+      } catch {
+        alert('Erreur lors de l\'import')
+      }
+    }
+    reader.readAsText(file)
   }
 
   if (loading) return <div className="container"><h1>Chargement...</h1></div>
 
-  const totalCapital = data?.totalCapital || 0
-  const initialCapital = data?.initialCapital || 0
+  const totalCapital = data.totalCapital || 0
+  const initialCapital = data.initialCapital || 0
   const profit = totalCapital - initialCapital
   const profitPercent = initialCapital > 0 ? ((profit / initialCapital) * 100).toFixed(2) : 0
 
@@ -121,7 +251,7 @@ export default function Home() {
         </div>
         <div className="stat-card">
           <h3>Investisseurs</h3>
-          <div className="value">{data?.investors?.length || 0}</div>
+          <div className="value">{data.investors?.length || 0}</div>
         </div>
       </div>
 
@@ -134,13 +264,20 @@ export default function Home() {
           <button className="btn-success" onClick={() => setShowUpdateCapital(true)}>
             📈 Mettre à jour le Capital
           </button>
+          <button className="btn-secondary" onClick={exportData} style={{ background: '#666' }}>
+            💾 Exporter
+          </button>
+          <label className="btn-secondary" style={{ background: '#666', padding: '12px 25px', borderRadius: '8px', cursor: 'pointer' }}>
+            📂 Importer
+            <input type="file" accept=".json" onChange={importData} style={{ display: 'none' }} />
+          </label>
         </div>
       </div>
 
       {/* Investors Table */}
       <div className="section">
         <h2>👥 Investisseurs</h2>
-        {data?.investors?.length > 0 ? (
+        {data.investors?.length > 0 ? (
           <table>
             <thead>
               <tr>
@@ -156,8 +293,8 @@ export default function Home() {
             </thead>
             <tbody>
               {data.investors.map(inv => {
-                const share = (inv.capital / initialCapital) * 100
-                const currentValue = (share / 100) * totalCapital
+                const share = initialCapital > 0 ? (inv.capital / initialCapital) * 100 : 0
+                const currentValue = initialCapital > 0 ? (share / 100) * totalCapital : inv.capital
                 const gains = currentValue - inv.capital
                 const commission = gains > 0 ? gains * (inv.commissionRate / 100) : 0
                 
@@ -167,7 +304,7 @@ export default function Home() {
                     <td>{formatCurrency(inv.capital)}</td>
                     <td>{share.toFixed(2)}%</td>
                     <td>{formatCurrency(currentValue)}</td>
-                    <td className={gains >= 0 ? 'profit' : 'loss'} style={{ color: gains >= 0 ? '#00ff88' : '#ff4757' }}>
+                    <td style={{ color: gains >= 0 ? '#00ff88' : '#ff4757' }}>
                       {gains >= 0 ? '+' : ''}{formatCurrency(gains)}
                     </td>
                     <td>{inv.commissionRate}%</td>
@@ -209,7 +346,7 @@ export default function Home() {
       {/* History */}
       <div className="section">
         <h2>📜 Historique</h2>
-        {data?.history?.length > 0 ? (
+        {data.history?.length > 0 ? (
           data.history.slice(0, 10).map((h, i) => (
             <div className="history-item" key={i}>
               <div>
@@ -253,7 +390,7 @@ export default function Home() {
                 />
               </div>
               <div className="form-group">
-                <label>Commission (%)</label>
+                <label>Commission sur gains (%)</label>
                 <input 
                   type="number"
                   value={newInvestor.commission}
@@ -298,7 +435,7 @@ export default function Home() {
                   step="0.01"
                   value={capitalUpdate.newTotal}
                   onChange={e => setCapitalUpdate({...capitalUpdate, newTotal: e.target.value})}
-                  placeholder={totalCapital}
+                  placeholder={totalCapital.toString()}
                   required
                 />
               </div>
@@ -319,7 +456,7 @@ export default function Home() {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <h3>💰 Commission - {showCommissionModal.name}</h3>
             {(() => {
-              const share = (showCommissionModal.capital / initialCapital) * 100
+              const share = initialCapital > 0 ? (showCommissionModal.capital / initialCapital) * 100 : 0
               const currentValue = (share / 100) * totalCapital
               const gains = currentValue - showCommissionModal.capital
               const commission = gains > 0 ? gains * (showCommissionModal.commissionRate / 100) : 0
@@ -369,6 +506,10 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      <p style={{ textAlign: 'center', color: '#666', marginTop: '30px', fontSize: '0.85rem' }}>
+        💾 Les données sont stockées localement dans votre navigateur. Utilisez Export/Import pour sauvegarder.
+      </p>
     </div>
   )
 }
