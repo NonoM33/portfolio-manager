@@ -1,29 +1,22 @@
-import { getData, saveData, addHistory } from '@/lib/db'
+import { addInvestor } from '@/lib/db'
 import { NextResponse } from 'next/server'
-import { v4 as uuid } from 'uuid'
+
+export const dynamic = 'force-dynamic'
 
 export async function POST(request) {
-  const body = await request.json()
-  const { name, capital, commissionRate, mode } = body
-  
-  const data = getData()
-  
-  const investor = {
-    id: uuid(),
-    name,
-    capital: parseFloat(capital),
-    commissionRate: parseFloat(commissionRate) || 55,
-    mode: mode || 'reinvest',
-    createdAt: new Date().toISOString()
+  try {
+    const body = await request.json()
+    const { name, capital, commissionRate, mode } = body
+    
+    const investor = await addInvestor({
+      name,
+      capital: parseFloat(capital),
+      commissionRate: parseFloat(commissionRate) || 55,
+      mode: mode || 'reinvest'
+    })
+    
+    return NextResponse.json({ success: true, investor })
+  } catch (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
-  
-  data.investors.push(investor)
-  data.initialCapital += investor.capital
-  data.totalCapital += investor.capital
-  
-  addHistory(data, 'Nouvel investisseur', name, investor.capital)
-  
-  saveData(data)
-  
-  return NextResponse.json({ success: true, investor })
 }

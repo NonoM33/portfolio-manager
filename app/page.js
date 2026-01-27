@@ -12,214 +12,91 @@ const formatDate = (date) => {
   })
 }
 
-const defaultData = {
-  totalCapital: 0,
-  initialCapital: 0,
-  investors: [],
-  history: []
-}
-
-// Local storage helpers
-const STORAGE_KEY = 'portfolio_data'
-
-function loadData() {
-  if (typeof window === 'undefined') return defaultData
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    return saved ? JSON.parse(saved) : defaultData
-  } catch {
-    return defaultData
-  }
-}
-
-function saveData(data) {
-  if (typeof window === 'undefined') return
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-}
-
-function generateId() {
-  return Math.random().toString(36).substr(2, 9) + Date.now().toString(36)
-}
-
 export default function Home() {
-  const [data, setData] = useState(defaultData)
+  const [data, setData] = useState({ totalCapital: 0, initialCapital: 0, investors: [], history: [] })
   const [loading, setLoading] = useState(true)
   const [showAddInvestor, setShowAddInvestor] = useState(false)
   const [showUpdateCapital, setShowUpdateCapital] = useState(false)
   const [showCommissionModal, setShowCommissionModal] = useState(null)
   
-  // Form states
   const [newInvestor, setNewInvestor] = useState({ name: '', capital: '', commission: 55, mode: 'reinvest' })
   const [capitalUpdate, setCapitalUpdate] = useState({ newTotal: '' })
   const [commissionAction, setCommissionAction] = useState({ amount: '', action: 'withdraw' })
 
-  useEffect(() => {
-    setData(loadData())
+  const fetchData = async () => {
+    try {
+      const res = await fetch('/api/portfolio')
+      const json = await res.json()
+      setData(json)
+    } catch (e) {
+      console.error('Fetch error:', e)
+    }
     setLoading(false)
-  }, [])
-
-  const updateData = (newData) => {
-    setData(newData)
-    saveData(newData)
   }
 
-  const addInvestor = (e) => {
+  useEffect(() => { fetchData() }, [])
+
+  const addInvestor = async (e) => {
     e.preventDefault()
-    const investor = {
-      id: generateId(),
-      name: newInvestor.name,
-      capital: parseFloat(newInvestor.capital),
-      commissionRate: parseFloat(newInvestor.commission) || 55,
-      mode: newInvestor.mode,
-      createdAt: new Date().toISOString()
-    }
-    
-    const newData = {
-      ...data,
-      investors: [...data.investors, investor],
-      initialCapital: data.initialCapital + investor.capital,
-      totalCapital: data.totalCapital + investor.capital,
-      history: [{
-        type: 'Nouvel investisseur',
-        investor: investor.name,
-        amount: investor.capital,
-        date: new Date().toISOString()
-      }, ...data.history].slice(0, 100)
-    }
-    
-    updateData(newData)
+    await fetch('/api/investors', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: newInvestor.name,
+        capital: parseFloat(newInvestor.capital),
+        commissionRate: parseFloat(newInvestor.commission),
+        mode: newInvestor.mode
+      })
+    })
     setNewInvestor({ name: '', capital: '', commission: 55, mode: 'reinvest' })
     setShowAddInvestor(false)
+    fetchData()
   }
 
-  const updateCapital = (e) => {
+  const updateCapital = async (e) => {
     e.preventDefault()
-    const newTotal = parseFloat(capitalUpdate.newTotal)
-    const diff = newTotal - data.totalCapital
-    
-    const newData = {
-      ...data,
-      totalCapital: newTotal,
-      history: [{
-        type: diff >= 0 ? 'Profit' : 'Perte',
-        investor: null,
-        amount: diff,
-        date: new Date().toISOString()
-      }, ...data.history].slice(0, 100)
-    }
-    
-    updateData(newData)
+    await fetch('/api/capital', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newTotal: parseFloat(capitalUpdate.newTotal) })
+    })
     setCapitalUpdate({ newTotal: '' })
     setShowUpdateCapital(false)
+    fetchData()
   }
 
-  const handleCommission = (investorId) => {
-    const investor = data.investors.find(i => i.id === investorId)
-    if (!investor) return
-    
-    const share = investor.capital / data.initialCapital
-    const currentValue = share * data.totalCapital
-    const gains = currentValue - investor.capital
-    const maxCommission = gains > 0 ? gains * (investor.commissionRate / 100) : 0
-    const amount = commissionAction.amount ? Math.min(parseFloat(commissionAction.amount), maxCommission) : maxCommission
-    
-    if (amount <= 0) return
-    
-    let newData
-    if (commissionAction.action === 'withdraw') {
-      newData = {
-        ...data,
-        totalCapital: data.totalCapital - amount,
-        history: [{
-          type: 'Commission retirée',
-          investor: investor.name,
-          amount: -amount,
-          date: new Date().toISOString()
-        }, ...data.history].slice(0, 100)
-      }
-    } else {
-      newData = {
-        ...data,
-        investors: data.investors.map(i => 
-          i.id === investorId ? { ...i, capital: i.capital + amount } : i
-        ),
-        initialCapital: data.initialCapital + amount,
-        history: [{
-          type: 'Commission réinvestie',
-          investor: investor.name,
-          amount: amount,
-          date: new Date().toISOString()
-        }, ...data.history].slice(0, 100)
-      }
-    }
-    
-    updateData(newData)
+  const handleCommission = async (investorId) => {
+    await fetch('/api/commission', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        investorId,
+        action: commissionAction.action,
+        amount: commissionAction.amount ? parseFloat(commissionAction.amount) : null
+      })
+    })
     setCommissionAction({ amount: '', action: 'withdraw' })
     setShowCommissionModal(null)
+    fetchData()
   }
 
-  const toggleMode = (investorId, currentMode) => {
-    const newData = {
-      ...data,
-      investors: data.investors.map(i => 
-        i.id === investorId ? { ...i, mode: currentMode === 'reinvest' ? 'withdraw' : 'reinvest' } : i
-      )
-    }
-    updateData(newData)
+  const toggleMode = async (investorId, currentMode) => {
+    await fetch('/api/investors/' + investorId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: currentMode === 'reinvest' ? 'withdraw' : 'reinvest' })
+    })
+    fetchData()
   }
 
-  const removeInvestor = (investorId) => {
+  const removeInvestor = async (investorId) => {
     if (!confirm('Supprimer cet investisseur ?')) return
-    
-    const investor = data.investors.find(i => i.id === investorId)
-    if (!investor) return
-    
-    const share = investor.capital / data.initialCapital
-    const valueToRemove = share * data.totalCapital
-    
-    const newData = {
-      ...data,
-      investors: data.investors.filter(i => i.id !== investorId),
-      initialCapital: data.initialCapital - investor.capital,
-      totalCapital: data.totalCapital - valueToRemove,
-      history: [{
-        type: 'Investisseur retiré',
-        investor: investor.name,
-        amount: -investor.capital,
-        date: new Date().toISOString()
-      }, ...data.history].slice(0, 100)
-    }
-    
-    updateData(newData)
+    await fetch('/api/investors/' + investorId, { method: 'DELETE' })
+    fetchData()
   }
 
-  const exportData = () => {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `portfolio-backup-${new Date().toISOString().split('T')[0]}.json`
-    a.click()
-  }
-
-  const importData = (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      try {
-        const imported = JSON.parse(event.target.result)
-        if (imported.investors && imported.totalCapital !== undefined) {
-          updateData(imported)
-          alert('Données importées avec succès !')
-        } else {
-          alert('Format de fichier invalide')
-        }
-      } catch {
-        alert('Erreur lors de l\'import')
-      }
-    }
-    reader.readAsText(file)
+  const downloadBackup = () => {
+    window.open('/api/backup', '_blank')
   }
 
   if (loading) return <div className="container"><h1>Chargement...</h1></div>
@@ -233,7 +110,6 @@ export default function Home() {
     <div className="container">
       <h1>💹 Trading Portfolio Manager</h1>
 
-      {/* Stats */}
       <div className="stats-grid">
         <div className="stat-card">
           <h3>Capital Total</h3>
@@ -255,7 +131,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Actions */}
       <div className="section">
         <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
           <button className="btn-primary" onClick={() => setShowAddInvestor(true)}>
@@ -264,17 +139,12 @@ export default function Home() {
           <button className="btn-success" onClick={() => setShowUpdateCapital(true)}>
             📈 Mettre à jour le Capital
           </button>
-          <button className="btn-secondary" onClick={exportData} style={{ background: '#666' }}>
-            💾 Exporter
+          <button className="btn-secondary" onClick={downloadBackup} style={{ background: '#666' }}>
+            💾 Télécharger Backup
           </button>
-          <label className="btn-secondary" style={{ background: '#666', padding: '12px 25px', borderRadius: '8px', cursor: 'pointer' }}>
-            📂 Importer
-            <input type="file" accept=".json" onChange={importData} style={{ display: 'none' }} />
-          </label>
         </div>
       </div>
 
-      {/* Investors Table */}
       <div className="section">
         <h2>👥 Investisseurs</h2>
         {data.investors?.length > 0 ? (
@@ -343,7 +213,6 @@ export default function Home() {
         )}
       </div>
 
-      {/* History */}
       <div className="section">
         <h2>📜 Historique</h2>
         {data.history?.length > 0 ? (
@@ -364,7 +233,6 @@ export default function Home() {
         )}
       </div>
 
-      {/* Modal: Add Investor */}
       {showAddInvestor && (
         <div className="modal-overlay" onClick={() => setShowAddInvestor(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -419,7 +287,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* Modal: Update Capital */}
       {showUpdateCapital && (
         <div className="modal-overlay" onClick={() => setShowUpdateCapital(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -450,7 +317,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* Modal: Commission Action */}
       {showCommissionModal && (
         <div className="modal-overlay" onClick={() => setShowCommissionModal(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
@@ -508,7 +374,7 @@ export default function Home() {
       )}
 
       <p style={{ textAlign: 'center', color: '#666', marginTop: '30px', fontSize: '0.85rem' }}>
-        💾 Les données sont stockées localement dans votre navigateur. Utilisez Export/Import pour sauvegarder.
+        🗄️ Données stockées en base PostgreSQL avec backup mensuel automatique
       </p>
     </div>
   )
