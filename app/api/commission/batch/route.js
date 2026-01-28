@@ -20,9 +20,12 @@ export async function POST(request) {
     
     // Calculate each investor's commission based on snapshot
     const investorCommissions = {}
+    const currentRatio = snapshot.initialCapital > 0 ? snapshot.totalCapital / snapshot.initialCapital : 1
     for (const investor of snapshot.investors) {
-      const share = investor.capital / snapshot.initialCapital
-      const currentValue = share * snapshot.totalCapital
+      // Calculate gains based on entry ratio (when investor joined)
+      const entryRatio = investor.entryRatio || 1.0
+      const performanceSinceEntry = entryRatio > 0 ? currentRatio / entryRatio : 1
+      const currentValue = investor.capital * performanceSinceEntry
       const gains = currentValue - investor.capital
       const maxCommission = gains > 0 ? gains * (investor.commissionRate / 100) : 0
       

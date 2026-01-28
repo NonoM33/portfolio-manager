@@ -114,9 +114,11 @@ export default function Home() {
   const openBatchReinvest = () => {
     // Initialize selections with max commission for each investor
     const selections = {}
+    const currentRatio = initialCapital > 0 ? totalCapital / initialCapital : 1
     data.investors?.forEach(inv => {
-      const share = initialCapital > 0 ? (inv.capital / initialCapital) * 100 : 0
-      const currentValue = (share / 100) * totalCapital
+      const entryRatio = inv.entryRatio || 1.0
+      const performanceSinceEntry = entryRatio > 0 ? currentRatio / entryRatio : 1
+      const currentValue = inv.capital * performanceSinceEntry
       const gains = currentValue - inv.capital
       const maxCommission = gains > 0 ? gains * (inv.commissionRate / 100) : 0
       
@@ -260,10 +262,15 @@ export default function Home() {
         {data.investors?.length > 0 ? (
           <div className="investor-cards">
             {data.investors.map(inv => {
-              const share = initialCapital > 0 ? (inv.capital / initialCapital) * 100 : 0
-              const currentValue = initialCapital > 0 ? (share / 100) * totalCapital : inv.capital
+              // Calculate gains based on entry ratio (when investor joined)
+              const currentRatio = initialCapital > 0 ? totalCapital / initialCapital : 1
+              const entryRatio = inv.entryRatio || 1.0
+              // Current value = capital * (performance since entry)
+              const performanceSinceEntry = entryRatio > 0 ? currentRatio / entryRatio : 1
+              const currentValue = inv.capital * performanceSinceEntry
               const gains = currentValue - inv.capital
               const commission = gains > 0 ? gains * (inv.commissionRate / 100) : 0
+              const share = initialCapital > 0 ? (inv.capital / initialCapital) * 100 : 0
               
               return (
                 <div className="investor-card" key={inv.id}>
@@ -546,8 +553,10 @@ export default function Home() {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <h3>💰 Commission - {showCommissionModal.name}</h3>
             {(() => {
-              const share = initialCapital > 0 ? (showCommissionModal.capital / initialCapital) * 100 : 0
-              const currentValue = (share / 100) * totalCapital
+              const currentRatio = initialCapital > 0 ? totalCapital / initialCapital : 1
+              const entryRatio = showCommissionModal.entryRatio || 1.0
+              const performanceSinceEntry = entryRatio > 0 ? currentRatio / entryRatio : 1
+              const currentValue = showCommissionModal.capital * performanceSinceEntry
               const gains = currentValue - showCommissionModal.capital
               const commission = gains > 0 ? gains * (showCommissionModal.commissionRate / 100) : 0
               return (
