@@ -20,6 +20,8 @@ export default function Home() {
   const [showCommissionModal, setShowCommissionModal] = useState(null)
   const [showEditInvestor, setShowEditInvestor] = useState(null)
   const [showHelp, setShowHelp] = useState(false)
+  const [showBatchReinvest, setShowBatchReinvest] = useState(false)
+  const [batchSelections, setBatchSelections] = useState({})
   
   const [newInvestor, setNewInvestor] = useState({ name: '', capital: '', commission: 55, mode: 'reinvest' })
   const [capitalUpdate, setCapitalUpdate] = useState({ newTotal: '' })
@@ -94,6 +96,63 @@ export default function Home() {
     setShowEditInvestor(null)
     setEditForm({ commissionRate: '' })
     fetchData()
+  }
+
+  const openBatchReinvest = () => {
+    // Initialize selections with max commission for each investor
+    const selections = {}
+    data.investors?.forEach(inv => {
+      const share = initialCapital > 0 ? (inv.capital / initialCapital) * 100 : 0
+      const currentValue = (share / 100) * totalCapital
+      const gains = currentValue - inv.capital
+      const maxCommission = gains > 0 ? gains * (inv.commissionRate / 100) : 0
+      
+      if (maxCommission > 0) {
+        selections[inv.id] = {
+          selected: true,
+          amount: Math.round(maxCommission * 100) / 100,
+          maxCommission: Math.round(maxCommission * 100) / 100,
+          name: inv.name
+        }
+      }
+    })
+    setBatchSelections(selections)
+    setShowBatchReinvest(true)
+  }
+
+  const applyBatchReinvest = async () => {
+    const reinvestments = Object.entries(batchSelections)
+      .filter(([_, val]) => val.selected && val.amount > 0)
+      .map(([investorId, val]) => ({
+        investorId,
+        action: 'reinvest',
+        amount: parseFloat(val.amount)
+      }))
+    
+    if (reinvestments.length === 0) {
+      alert('Sélectionne au moins un investisseur')
+      return
+    }
+    
+    try {
+      const res = await fetch('/api/commission/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reinvestments })
+      })
+      const json = await res.json()
+      
+      if (json.success) {
+        alert(`✅ ${json.applied} réinvestissement(s) appliqué(s)\nTotal: ${formatCurrency(json.totalReinvested)}`)
+        setShowBatchReinvest(false)
+        setBatchSelections({})
+        fetchData()
+      } else {
+        alert('Erreur: ' + json.error)
+      }
+    } catch (e) {
+      alert('Erreur de connexion')
+    }
   }
 
   const toggleMode = async (investorId, currentMode) => {
@@ -176,6 +235,9 @@ export default function Home() {
           </button>
           <button className="btn-secondary btn-large" onClick={downloadBackup}>
             💾 Backup
+          </button>
+          <button className="btn-warning btn-large" onClick={openBatchReinvest}>
+            🔄 Réinvestir tout
           </button>
         </div>
       </div>
@@ -505,6 +567,102 @@ export default function Home() {
                 onClick={() => handleCommission(showCommissionModal.id)}
               >
                 Confirmer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Batch Reinvest Modal */}
+      {showBatchReinvest && (
+        <div className="modal-overlay" onClick={() => setShowBatchReinvest(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <h3>🔄 Réinvestir les commissions</h3>
+            <p style={{ color: '#aaa', marginBottom: '15px', fontSize: '0.9rem' }}>
+              ⚡ Les calculs sont basés sur un snapshot. L'ordre de sélection n'affecte pas les montants.
+            </p>
+            
+            {Object.keys(batchSelections).length === 0 ? (
+              <p style={{ color: '#ff4757', textAlign: 'center', padding: '20px' }}>
+                Aucune commission disponible à réinvestir
+              </p>
+            ) : (
+              <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                {Object.entries(batchSelections).map(([investorId, sel]) => (
+                  <div key={investorId} style={{ 
+                    background: 'rgba(255,255,255,0.05)', 
+                    padding: '12px', 
+                    borderRadius: '8px',
+                    marginBottom: '10px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                      <input 
+                        type="checkbox"
+                        checked={sel.selected}
+                        onChange={e => setBatchSelections({
+                          ...batchSelections,
+                          [investorId]: { ...sel, selected: e.target.checked }
+                        })}
+                        style={{ width: '18px', height: '18px' }}
+                      />
+                      <strong>{sel.name}</strong>
+                      <span style={{ marginLeft: 'auto', color: '#00d4ff' }}>
+                        max: {formatCurrency(sel.maxCommission)}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ color: '#888' }}>Montant:</span>
+                      <input 
+                        type="number"
+                        step="0.01"
+                        value={sel.amount}
+                        onChange={e => setBatchSelections({
+                          ...batchSelections,
+                          [investorId]: { ...sel, amount: e.target.value }
+                        })}
+                        style={{ 
+                          flex: 1, 
+                          padding: '8px', 
+                          background: 'rgba(0,0,0,0.3)', 
+                          border: '1px solid #333',
+                          borderRadius: '5px',
+                          color: 'white'
+                        }}
+                        max={sel.maxCommission}
+                      />
+                      <button 
+                        onClick={() => setBatchSelections({
+                          ...batchSelections,
+                          [investorId]: { ...sel, amount: sel.maxCommission }
+                        })}
+                        style={{ 
+                          padding: '8px 12px', 
+                          background: 'rgba(0,212,255,0.2)', 
+                          border: 'none',
+                          borderRadius: '5px',
+                          color: '#00d4ff',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        MAX
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            <div className="modal-actions" style={{ marginTop: '20px' }}>
+              <button type="button" className="btn-danger" onClick={() => setShowBatchReinvest(false)}>
+                Annuler
+              </button>
+              <button 
+                type="button" 
+                className="btn-success"
+                onClick={applyBatchReinvest}
+                disabled={Object.keys(batchSelections).length === 0}
+              >
+                ✅ Réinvestir
               </button>
             </div>
           </div>

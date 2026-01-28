@@ -132,6 +132,16 @@ button, .btn {
   color: #fff;
 }
 
+.btn-warning {
+  background: linear-gradient(90deg, #ffa726, #ff7043);
+  color: #000;
+}
+
+.btn-warning:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 20px rgba(255,167,38,0.3);
+}
+
 .btn-sm {
   padding: 10px 15px;
   font-size: 0.85rem;
