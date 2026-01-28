@@ -94,7 +94,7 @@ export async function POST(request) {
           )
           totalWithdrawn += r.amount
         } else {
-          // reinvest
+          // reinvest - increase capital and initial
           await pool.query(
             'UPDATE investors SET capital = capital + $1 WHERE id = $2',
             [r.amount, r.investorId]
@@ -108,6 +108,25 @@ export async function POST(request) {
             ['Commission réinvestie (batch)', r.name, r.amount]
           )
           totalReinvested += r.amount
+        }
+      }
+      
+      // After all reinvestments, update entry_ratio for each investor who reinvested
+      // This resets their commission to 0 (prevents claiming same commission twice)
+      if (totalReinvested > 0) {
+        const newInitialCapital = snapshot.initialCapital + totalReinvested
+        const newEntryRatio = snapshot.totalCapital / newInitialCapital
+        
+        // Update entry_ratio for all investors who reinvested
+        const reinvestedIds = validatedReinvestments
+          .filter(r => r.action !== 'withdraw')
+          .map(r => r.investorId)
+        
+        if (reinvestedIds.length > 0) {
+          await pool.query(
+            `UPDATE investors SET entry_ratio = $1 WHERE id = ANY($2::uuid[])`,
+            [newEntryRatio, reinvestedIds]
+          )
         }
       }
       

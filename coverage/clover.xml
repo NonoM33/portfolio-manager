@@ -1,28 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1769610176708" clover="3.2.0">
-  <project timestamp="1769610176708" name="All files">
-    <metrics statements="46" coveredstatements="46" conditionals="28" coveredconditionals="28" methods="14" coveredmethods="14" elements="88" coveredelements="88" complexity="0" loc="46" ncloc="46" packages="1" files="1" classes="1"/>
+<coverage generated="1769610617647" clover="3.2.0">
+  <project timestamp="1769610617647" name="All files">
+    <metrics statements="48" coveredstatements="48" conditionals="30" coveredconditionals="30" methods="15" coveredmethods="15" elements="93" coveredelements="93" complexity="0" loc="48" ncloc="48" packages="1" files="1" classes="1"/>
     <file name="calculations.js" path="/Users/renaud.cosson-ext/portfolio-manager/lib/calculations.js">
-      <metrics statements="46" coveredstatements="46" conditionals="28" coveredconditionals="28" methods="14" coveredmethods="14"/>
+      <metrics statements="48" coveredstatements="48" conditionals="30" coveredconditionals="30" methods="15" coveredmethods="15"/>
       <line num="14" count="9" type="cond" truecount="2" falsecount="0"/>
       <line num="15" count="5" type="stmt"/>
-      <line num="25" count="21" type="cond" truecount="2" falsecount="0"/>
-      <line num="26" count="18" type="stmt"/>
-      <line num="37" count="25" type="cond" truecount="2" falsecount="0"/>
-      <line num="38" count="23" type="stmt"/>
-      <line num="39" count="23" type="stmt"/>
-      <line num="49" count="21" type="stmt"/>
-      <line num="60" count="26" type="cond" truecount="2" falsecount="0"/>
-      <line num="61" count="19" type="cond" truecount="2" falsecount="0"/>
-      <line num="62" count="15" type="cond" truecount="2" falsecount="0"/>
-      <line num="63" count="15" type="stmt"/>
-      <line num="74" count="17" type="stmt"/>
-      <line num="75" count="17" type="cond" truecount="2" falsecount="0"/>
-      <line num="76" count="17" type="stmt"/>
-      <line num="77" count="17" type="stmt"/>
-      <line num="78" count="17" type="cond" truecount="2" falsecount="0"/>
-      <line num="79" count="17" type="cond" truecount="2" falsecount="0"/>
-      <line num="81" count="17" type="stmt"/>
+      <line num="25" count="25" type="cond" truecount="2" falsecount="0"/>
+      <line num="26" count="22" type="stmt"/>
+      <line num="37" count="29" type="cond" truecount="2" falsecount="0"/>
+      <line num="38" count="27" type="stmt"/>
+      <line num="39" count="27" type="stmt"/>
+      <line num="49" count="25" type="stmt"/>
+      <line num="60" count="30" type="cond" truecount="2" falsecount="0"/>
+      <line num="61" count="21" type="cond" truecount="2" falsecount="0"/>
+      <line num="62" count="17" type="cond" truecount="2" falsecount="0"/>
+      <line num="63" count="17" type="stmt"/>
+      <line num="74" count="21" type="stmt"/>
+      <line num="75" count="21" type="cond" truecount="2" falsecount="0"/>
+      <line num="76" count="21" type="stmt"/>
+      <line num="77" count="21" type="stmt"/>
+      <line num="78" count="21" type="cond" truecount="2" falsecount="0"/>
+      <line num="79" count="21" type="cond" truecount="2" falsecount="0"/>
+      <line num="81" count="21" type="stmt"/>
       <line num="100" count="5" type="stmt"/>
       <line num="101" count="5" type="stmt"/>
       <line num="102" count="9" type="stmt"/>
@@ -44,12 +44,14 @@
       <line num="154" count="8" type="stmt"/>
       <line num="169" count="3" type="stmt"/>
       <line num="185" count="1" type="stmt"/>
-      <line num="200" count="1" type="stmt"/>
-      <line num="215" count="3" type="stmt"/>
-      <line num="216" count="3" type="stmt"/>
-      <line num="225" count="60" type="stmt"/>
-      <line num="229" count="18" type="stmt"/>
-      <line num="232" count="1" type="stmt"/>
+      <line num="202" count="6" type="cond" truecount="2" falsecount="0"/>
+      <line num="203" count="4" type="stmt"/>
+      <line num="215" count="1" type="stmt"/>
+      <line num="230" count="3" type="stmt"/>
+      <line num="231" count="3" type="stmt"/>
+      <line num="240" count="72" type="stmt"/>
+      <line num="244" count="22" type="stmt"/>
+      <line num="247" count="1" type="stmt"/>
     </file>
   </project>
 </coverage>

@@ -11,6 +11,7 @@ const {
   calculateStateAfterReinvest,
   calculateStateAfterWithdraw,
   calculateStateAfterCapitalAdjustment,
+  calculateEntryRatioAfterReinvest,
   roundToCents,
   roundToPercent,
 } = require('../lib/calculations')
@@ -444,6 +445,32 @@ describe('Portfolio Manager Calculations', () => {
   // ==========================================
   // UTILITY TESTS
   // ==========================================
+  describe('calculateEntryRatioAfterReinvest', () => {
+    test('returns current ratio (resets gains to 0)', () => {
+      // After commission action, entry ratio = new current ratio
+      // total=12000, newInitial=10100 -> ratio = 1.188
+      const newEntryRatio = calculateEntryRatioAfterReinvest(12000, 10100)
+      expect(newEntryRatio).toBeCloseTo(1.188, 2)
+    })
+
+    test('returns 1.0 when newInitialCapital is 0', () => {
+      const newRatio = calculateEntryRatioAfterReinvest(12000, 0)
+      expect(newRatio).toBe(1.0)
+    })
+
+    test('returns 1.0 when newInitialCapital is negative', () => {
+      const newRatio = calculateEntryRatioAfterReinvest(12000, -100)
+      expect(newRatio).toBe(1.0)
+    })
+
+    test('equals current ratio after any reinvestment', () => {
+      // After reinvesting 100, newInitial = 10100
+      const newEntryRatio = calculateEntryRatioAfterReinvest(12000, 10100)
+      const expectedRatio = 12000 / 10100
+      expect(newEntryRatio).toBe(expectedRatio)
+    })
+  })
+
   describe('roundToCents', () => {
     test('rounds to 2 decimal places', () => {
       expect(roundToCents(100.456)).toBe(100.46)
@@ -500,6 +527,68 @@ describe('Portfolio Manager Calculations', () => {
       // New investor: entered at 1.2, now 1.2 -> 0% gain since entry
       expect(metrics['new'].gains).toBe(0)
       expect(metrics['new'].commission).toBe(0)
+    })
+
+    test('Scenario: Commission decreases after reinvestment (regression test)', () => {
+      // BUG: After reinvestment, commission column should decrease
+      // Setup: Investor with 1000€, portfolio at 20% gain
+      const investor = { 
+        id: 'test', 
+        name: 'Test', 
+        capital: 1000, 
+        entryRatio: 1.0, 
+        commissionRate: 50 
+      }
+      
+      // Initial state: total=12000, initial=10000, ratio=1.2
+      const initialMetrics = calculateInvestorMetrics(investor, 12000, 10000)
+      expect(initialMetrics.gains).toBe(200)
+      expect(initialMetrics.commission).toBe(100)
+      
+      // After reinvesting 100€ commission:
+      // - New capital = 1100
+      // - New initialCapital = 10100
+      // - Total stays 12000
+      // - Entry ratio RESETS to current ratio = 12000/10100
+      
+      const newInitial = 10100
+      const newEntryRatio = calculateEntryRatioAfterReinvest(12000, newInitial)
+      
+      const updatedInvestor = {
+        ...investor,
+        capital: 1100,
+        entryRatio: newEntryRatio, // Now equals current ratio
+      }
+      
+      const afterMetrics = calculateInvestorMetrics(updatedInvestor, 12000, newInitial)
+      
+      // Commission should be ~0 because entry ratio = current ratio (gains reset)
+      expect(afterMetrics.gains).toBeCloseTo(0, 1)
+      expect(afterMetrics.commission).toBeCloseTo(0, 1)
+    })
+
+    test('Scenario: Full reinvestment results in near-zero commission', () => {
+      // If we reinvest ALL available commission, new commission should be ~0
+      const investor = { capital: 1000, entryRatio: 1.0, commissionRate: 50 }
+      
+      // Initial: ratio=1.2, gains=200, commission=100
+      const initialMetrics = calculateInvestorMetrics(investor, 12000, 10000)
+      const fullCommission = initialMetrics.commission // 100
+      
+      // Reinvest full commission - entry ratio resets
+      const newInitial = 10000 + fullCommission
+      const newEntryRatio = calculateEntryRatioAfterReinvest(12000, newInitial)
+      
+      const updatedInvestor = {
+        ...investor,
+        capital: 1000 + fullCommission,
+        entryRatio: newEntryRatio,
+      }
+      
+      const afterMetrics = calculateInvestorMetrics(updatedInvestor, 12000, newInitial)
+      
+      // Commission should be 0 (entry ratio = current ratio means no gains since "entry")
+      expect(afterMetrics.commission).toBeCloseTo(0, 1)
     })
 
     test('Scenario: Investor modifies capital after creation', () => {
