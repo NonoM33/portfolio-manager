@@ -141,12 +141,13 @@ describe('Portfolio Manager Calculations', () => {
       expect(calculateCommission(-100, 50)).toBe(0)
     })
 
-    test('returns 0 when commission rate is 0', () => {
-      expect(calculateCommission(200, 0)).toBe(0)
+    test('returns 100% of gains when commission rate is 0 (trader)', () => {
+      // Trader with 0% commission can reinvest 100% of their gains
+      expect(calculateCommission(200, 0)).toBe(200)
     })
 
-    test('returns 0 when commission rate is negative', () => {
-      expect(calculateCommission(200, -10)).toBe(0)
+    test('returns 100% of gains when commission rate is negative (treated as 0)', () => {
+      expect(calculateCommission(200, -10)).toBe(200)
     })
 
     test('calculates 50% commission correctly', () => {
@@ -204,12 +205,13 @@ describe('Portfolio Manager Calculations', () => {
       expect(metrics.commission).toBe(0)
     })
 
-    test('calculates metrics for investor with 0% commission rate', () => {
+    test('calculates metrics for investor with 0% commission rate (trader)', () => {
       const investor = { capital: 1000, entryRatio: 1.0, commissionRate: 0 }
       const metrics = calculateInvestorMetrics(investor, 12000, 10000)
       
       expect(metrics.gains).toBe(200)
-      expect(metrics.commission).toBe(0) // 0% commission = owner/trader
+      // Trader with 0% can reinvest 100% of their gains
+      expect(metrics.commission).toBe(200)
     })
 
     test('handles missing entryRatio (defaults to 1.0)', () => {
@@ -220,11 +222,12 @@ describe('Portfolio Manager Calculations', () => {
       expect(metrics.currentValue).toBe(1200)
     })
 
-    test('handles missing commissionRate (defaults to 0)', () => {
+    test('handles missing commissionRate (defaults to 0 = 100% reinvestable)', () => {
       const investor = { capital: 1000, entryRatio: 1.0 }
       const metrics = calculateInvestorMetrics(investor, 12000, 10000)
       
-      expect(metrics.commission).toBe(0)
+      // Missing commission rate defaults to 0, which means 100% of gains
+      expect(metrics.commission).toBe(200) // 100% of 200 gains
     })
 
     test('calculates share percentage correctly', () => {
@@ -589,6 +592,20 @@ describe('Portfolio Manager Calculations', () => {
       
       // Commission should be 0 (entry ratio = current ratio means no gains since "entry")
       expect(afterMetrics.commission).toBeCloseTo(0, 1)
+    })
+
+    test('Scenario: Trader (0% commission) can reinvest gains', () => {
+      // The trader has 0% commission but should be able to reinvest their gains
+      const trader = { capital: 5000, entryRatio: 1.0, commissionRate: 0 }
+      
+      // Portfolio at 20% gain: total=12000, initial=10000
+      const metrics = calculateInvestorMetrics(trader, 12000, 10000)
+      
+      // Trader has gains
+      expect(metrics.gains).toBe(1000) // 5000 * 0.2 = 1000
+      
+      // Trader can reinvest 100% of their gains (not 0%)
+      expect(metrics.commission).toBe(1000)
     })
 
     test('Scenario: Investor modifies capital after creation', () => {
