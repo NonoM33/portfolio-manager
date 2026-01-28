@@ -26,7 +26,7 @@ export default function Home() {
   const [newInvestor, setNewInvestor] = useState({ name: '', capital: '', commission: 55, mode: 'reinvest' })
   const [capitalUpdate, setCapitalUpdate] = useState({ newTotal: '' })
   const [commissionAction, setCommissionAction] = useState({ amount: '', action: 'withdraw' })
-  const [editForm, setEditForm] = useState({ commissionRate: '' })
+  const [editForm, setEditForm] = useState({ commissionRate: '', capital: '' })
 
   const fetchData = async () => {
     try {
@@ -86,6 +86,7 @@ export default function Home() {
   }
 
   const saveEditInvestor = async (investorId) => {
+    // Update commission rate
     await fetch('/api/investors/' + investorId, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -93,8 +94,20 @@ export default function Home() {
         commissionRate: parseFloat(editForm.commissionRate)
       })
     })
+    
+    // Update capital if changed
+    const originalCapital = showEditInvestor?.capital
+    const newCapital = parseFloat(editForm.capital)
+    if (newCapital && newCapital !== originalCapital && newCapital > 0) {
+      await fetch('/api/investors/' + investorId + '/capital', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newCapital })
+      })
+    }
+    
     setShowEditInvestor(null)
-    setEditForm({ commissionRate: '' })
+    setEditForm({ commissionRate: '', capital: '' })
     fetchData()
   }
 
@@ -266,7 +279,7 @@ export default function Home() {
                       <button 
                         onClick={() => {
                           setShowEditInvestor(inv)
-                          setEditForm({ commissionRate: inv.commissionRate.toString() })
+                          setEditForm({ commissionRate: inv.commissionRate.toString(), capital: inv.capital.toString() })
                         }}
                         style={{ 
                           background: 'rgba(255,255,255,0.1)', 
@@ -392,6 +405,19 @@ export default function Home() {
         <div className="modal-overlay" onClick={() => setShowEditInvestor(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <h3>✏️ Modifier {showEditInvestor.name}</h3>
+            <div className="form-group">
+              <label>Capital investi (€)</label>
+              <input 
+                type="number"
+                step="0.01"
+                value={editForm.capital}
+                onChange={e => setEditForm({...editForm, capital: e.target.value})}
+                placeholder="Montant investi"
+              />
+              <small style={{ color: '#888', marginTop: '5px', display: 'block' }}>
+                💰 Modifie le capital initial de l'investisseur
+              </small>
+            </div>
             <div className="form-group">
               <label>Commission sur gains (%)</label>
               <input 
